@@ -1,15 +1,15 @@
 'use client'
-import { ReactNode } from 'react';
-import { MeshProvider } from '@meshsdk/react';
+import React from 'react';
+import AppKitProvider from './AppKitProvider';
 
 interface WalletProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
   return (
-    <MeshProvider>
+    <AppKitProvider>
       {children}
-    </MeshProvider>
+    </AppKitProvider>
   );
 }

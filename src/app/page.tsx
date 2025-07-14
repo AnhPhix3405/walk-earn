@@ -1,8 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { useWalletList, useWallet } from '@meshsdk/react';
+import { useAppKit } from '@reown/appkit/react';
+import { useAccount, useBalance, useDisconnect } from 'wagmi';
 import { WalletProvider } from '../components/WalletProvider';
-import { MobileWalletConnect } from '../components/MobileWalletConnect';
 import { 
   Wallet, 
   Activity, 
@@ -21,14 +21,16 @@ import {
 } from 'lucide-react';
 
 function WalkEarnApp() {
-  const { connect, connected, disconnect, name, wallet } = useWallet();
-  const wallets = useWalletList();
+  const { open } = useAppKit();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { data: balance } = useBalance({
+    address: address,
+  });
+  
   const [isWalking, setIsWalking] = useState(false);
   const [walkingTime, setWalkingTime] = useState(0);
-  const [showWalletList, setShowWalletList] = useState(false);
   const [showMobileConnect, setShowMobileConnect] = useState(false);
-  const [walletAddress, setWalletAddress] = useState("");
-  const [walletBalance, setWalletBalance] = useState(0);
   const [isMobileConnected, setIsMobileConnected] = useState(false);
 
   // Detect if user is on mobile
@@ -45,72 +47,39 @@ function WalkEarnApp() {
 
   // Get wallet info when connected
   useEffect(() => {
-    async function getWalletInfo() {
-      if (wallet && connected) {
-        try {
-          const addr = await wallet.getChangeAddress();
-          setWalletAddress(addr.slice(0, 12) + '...' + addr.slice(-8));
-          
-          // Get wallet balance (convert from lovelace to ADA)
-          const balance = await wallet.getBalance();
-          if (balance && balance.length > 0) {
-            const adaBalance = balance.find((asset: any) => asset.unit === 'lovelace');
-            if (adaBalance) {
-              setWalletBalance(parseInt(adaBalance.quantity) / 1000000);
-            }
-          }
-        } catch (error) {
-          console.error("Error getting wallet info:", error);
-        }
-      }
-    }
+    // AppKit handles wallet info automatically through useAccount and useBalance
+  }, [address, isConnected]);
 
-    if (connected) {
-      getWalletInfo();
-    }
-  }, [wallet, connected]);
-
-  const handleConnectWallet = (walletName: string) => {
-    if (isMobile) {
-      // For mobile, show WalletConnect modal
-      setShowMobileConnect(true);
-      setShowWalletList(false);
-    } else {
-      // For desktop, use normal extension connection
-      connect(walletName);
-      setShowWalletList(false);
-    }
+  const handleConnectWallet = () => {
+    open();
   };
 
-  const handleMobileConnect = (address: string, balance: number) => {
-    setWalletAddress(address.slice(0, 12) + '...' + address.slice(-8));
-    setWalletBalance(balance);
+  const handleMobileConnect = (addr: string, bal: number) => {
+    // This function is no longer needed with AppKit
     setIsMobileConnected(true);
     setShowMobileConnect(false);
   };
 
   const handleDisconnect = () => {
-    if (isMobileConnected) {
-      setIsMobileConnected(false);
-    } else {
-      disconnect();
-    }
-    setWalletAddress("");
-    setWalletBalance(0);
+    disconnect();
+    setIsMobileConnected(false);
   };
 
+  // Format address for display
+  const displayAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+  
   // Real data only - no mock data
-  const currentADA = (connected || isMobileConnected) ? walletBalance : 0;
+  const currentETH = balance ? parseFloat(balance.formatted).toFixed(4) : '0';
   const todayEarned = 0; // Will be calculated from real walking data
   const walkingHistory: any[] = []; // Will be populated from backend/local storage
   
   // Update connection status
-  const isConnected = connected || isMobileConnected;
-  const displayWalletName = isMobileConnected ? 'Eternl Mobile' : name;
+  const walletConnected = isConnected || isMobileConnected;
+  const displayWalletName = isMobileConnected ? 'Mobile Wallet' : (balance?.symbol || 'Connected');
 
   const handleStartWalking = () => {
-    if (!isConnected) {
-      alert('Vui lòng kết nối ví Cardano trước khi bắt đầu!');
+    if (!walletConnected) {
+      alert('Vui lòng kết nối ví trước khi bắt đầu!');
       return;
     }
     
@@ -144,11 +113,11 @@ function WalkEarnApp() {
             
             {/* Wallet Connection */}
             <div className="relative">
-              {isConnected ? (
+              {walletConnected ? (
                 <div className="flex items-center space-x-2">
                   <div className="flex items-center space-x-1 text-xs text-gray-600">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-mono">{walletAddress}</span>
+                    <span className="font-mono">{displayAddress}</span>
                   </div>
                   <button
                     onClick={handleDisconnect}
@@ -159,41 +128,13 @@ function WalkEarnApp() {
                   </button>
                 </div>
               ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      if (isMobile) {
-                        setShowMobileConnect(true);
-                      } else {
-                        setShowWalletList(!showWalletList);
-                      }
-                    }}
-                    className="flex items-center space-x-1 bg-gradient-to-r from-purple-500 to-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:from-purple-600 hover:to-blue-700 transition-colors"
-                  >
-                    <Wallet className="w-3 h-3" />
-                    <span>Kết nối ví</span>
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                  
-                  {showWalletList && !isMobile && (
-                    <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-gray-900 border border-gray-200 rounded-md shadow-lg z-10">
-                      {wallets.map((wallet, index) => (
-                        <button
-                          key={index}
-                          className="flex items-center w-full p-3 hover:bg-gray-100 dark:hover:bg-gray-800 text-left text-sm"
-                          onClick={() => handleConnectWallet(wallet.name)}
-                        >
-                          <img
-                            src={wallet.icon}
-                            alt={wallet.name}
-                            className="w-6 h-6 mr-3"
-                          />
-                          <span>{wallet.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
+                <button
+                  onClick={handleConnectWallet}
+                  className="flex items-center space-x-1 bg-gradient-to-r from-purple-500 to-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:from-purple-600 hover:to-blue-700 transition-colors"
+                >
+                  <Wallet className="w-3 h-3" />
+                  <span>Kết nối ví</span>
+                </button>
               )}
             </div>
           </div>
@@ -234,14 +175,14 @@ function WalkEarnApp() {
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-gray-900 mb-2">
-              {currentADA.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-              <span className="text-2xl font-medium text-gray-600 ml-2">ADA</span>
+              {currentETH} ETH
+              <span className="text-2xl font-medium text-gray-600 ml-2">ETH</span>
             </div>
             <div className="flex items-center justify-center space-x-2 text-sm text-green-600">
               <TrendingUp className="w-4 h-4" />
-              <span>+{todayEarned} ADA hôm nay</span>
+              <span>+{todayEarned} ETH hôm nay</span>
             </div>
-            {connected && (
+            {walletConnected && (
               <div className="mt-2 text-xs text-green-600 flex items-center justify-center space-x-1">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span>Kết nối thực với ví {displayWalletName}</span>
@@ -263,7 +204,7 @@ function WalkEarnApp() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600 mb-1">{todayEarned}</div>
-              <div className="text-sm text-gray-600">ADA kiếm được</div>
+              <div className="text-sm text-gray-600">ETH kiếm được</div>
             </div>
           </div>
         </div>
@@ -272,16 +213,16 @@ function WalkEarnApp() {
         <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6">
           <button
             onClick={handleStartWalking}
-            disabled={!isConnected}
+            disabled={!walletConnected}
             className={`w-full py-4 px-6 rounded-2xl font-semibold text-lg transition-all duration-300 flex items-center justify-center space-x-3 ${
-              !isConnected
+              !walletConnected
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : isWalking 
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30' 
                   : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg shadow-blue-500/30'
-            } ${isConnected ? 'transform hover:scale-105' : ''}`}
+            } ${walletConnected ? 'transform hover:scale-105' : ''}`}
           >
-            {!isConnected ? (
+            {!walletConnected ? (
               <>
                 <Wallet className="w-6 h-6" />
                 <span>Cần kết nối ví</span>
@@ -378,14 +319,6 @@ function WalkEarnApp() {
           </div>
         </div>
       </div>
-
-      {/* Mobile WalletConnect Modal */}
-      {showMobileConnect && (
-        <MobileWalletConnect
-          onConnect={handleMobileConnect}
-          onClose={() => setShowMobileConnect(false)}
-        />
-      )}
     </div>
   );
 }

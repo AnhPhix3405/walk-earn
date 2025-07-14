@@ -20,8 +20,9 @@ export function MobileWalletConnect({ onConnect, onClose }: MobileWalletConnectP
   }, [connectionType]);
 
   const generateWalletConnectUri = () => {
-    // Generate WalletConnect URI for mobile connection
-    const projectId = '2c8e53b3d9e7d8f9a5b2c4d6e8f0a1b3'; // Demo project ID
+    // TODO: Replace with your real WalletConnect Cloud Project ID
+    // Get it from: https://cloud.walletconnect.com/
+    const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '2c8e53b3d9e7d8f9a5b2c4d6e8f0a1b3';
     const uri = `wc:${generateRandomString(32)}@2?relay-protocol=irn&symKey=${generateRandomString(64)}&projectId=${projectId}`;
     setWalletConnectUri(uri);
   };
